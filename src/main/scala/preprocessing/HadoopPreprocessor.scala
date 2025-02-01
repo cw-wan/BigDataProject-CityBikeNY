@@ -1,22 +1,18 @@
 package preprocessing
 
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import common.{Constants, Utils}
+import common.Constants
 import org.apache.spark.sql.types.{DataTypes, Metadata, StructField, StructType}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.expressions.Window
 
 object HadoopPreprocessor {
   def main(args: Array[String]): Unit = {
-    // creat SparkSession
+    // create SparkSession
     val spark = SparkSession.builder()
       .appName("Hadoop Preprocessor")
       .master("local[*]") // local mode for development
       .getOrCreate()
-
-    /*
-     * STAGE 1: Data Cleaning
-     */
 
     // read raw citybike data (csv) from hdfs
     val cityBikeDataPath = s"${Constants.HDFS_RAW_DATA_PATH}/citybike"
@@ -35,7 +31,7 @@ object HadoopPreprocessor {
       StructField("end_lng", DataTypes.DoubleType, nullable = false, Metadata.empty),
       StructField("member_casual", DataTypes.StringType, nullable = false, Metadata.empty)
     ))
-    val cityBikeDF: DataFrame = spark.read
+    var cityBikeDF: DataFrame = spark.read
       .option("header", "true")
       .option("recursiveFileLookup", "true")
       .option("timestampFormat", "yyyy-MM-dd HH:mm:ss")
@@ -44,7 +40,21 @@ object HadoopPreprocessor {
       .csv(cityBikeDataPath)
 
     cityBikeDF.show()
-    println(s"#Entry in CityBike: ${cityBikeDF.count()}")
+    println(s"#Record in CityBike: ${cityBikeDF.count()}")
+    cityBikeDF = cityBikeDF.withColumn(
+      "duration",
+      (unix_timestamp(col("ended_at")) - unix_timestamp(col("started_at"))) / 3600.0
+    )
+    // filter out abnormal data, whose duration is negative or above 24 hours
+    cityBikeDF = cityBikeDF.filter(col("duration").between(0, 24))
+    println(s"After cleaning, record count: ${cityBikeDF.count()}")
+
+    // add truncated timestamp to facilitate future analysis
+    cityBikeDF = cityBikeDF
+      .withColumn("started_at_full", date_trunc("hour", col("started_at")))
+      .withColumn("ended_at_full", date_trunc("hour", col("ended_at")))
+
+    cityBikeDF.show()
     cityBikeDF.printSchema()
 
     // read raw weather data
@@ -97,7 +107,7 @@ object HadoopPreprocessor {
     // take care of missing data
     val columnsToFill = Seq("visibility")
     val sortedDF = weatherDF.orderBy("time")
-    val windowSpec = Window.orderBy("dt_parsed").rowsBetween(Window.unboundedPreceding, Window.currentRow)
+    val windowSpec = Window.orderBy("time").rowsBetween(Window.unboundedPreceding, Window.currentRow)
     weatherDF = columnsToFill.foldLeft(sortedDF) { (dfAcc, colName) =>
       dfAcc.withColumn(
         colName,
@@ -106,8 +116,16 @@ object HadoopPreprocessor {
     }
 
     weatherDF.show()
-    println(s"#Entry in WeatherDF: ${weatherDF.count()}")
+    println(s"#Record in WeatherDF: ${weatherDF.count()}")
     weatherDF.printSchema()
+
+    // save cleaned data
+    val outputPathCityBike = s"${Constants.HDFS_PROCESSED_DATA_PATH}/citybike"
+    cityBikeDF.write.mode("overwrite").option("header", "true").csv(outputPathCityBike)
+    println(s"Cleaned CityBike data written to $outputPathCityBike")
+    val outputPathWeather = s"${Constants.HDFS_PROCESSED_DATA_PATH}/weather"
+    weatherDF.write.mode("overwrite").option("header", "true").csv(outputPathWeather)
+    println(s"Cleaned Weather data written to $outputPathWeather")
 
     spark.stop()
   }
