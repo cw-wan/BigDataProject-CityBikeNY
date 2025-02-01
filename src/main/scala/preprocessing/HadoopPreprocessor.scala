@@ -119,13 +119,25 @@ object HadoopPreprocessor {
     println(s"#Record in WeatherDF: ${weatherDF.count()}")
     weatherDF.printSchema()
 
-    // save cleaned data
-    val outputPathCityBike = s"${Constants.HDFS_PROCESSED_DATA_PATH}/citybike"
-    cityBikeDF.write.mode("overwrite").option("header", "true").csv(outputPathCityBike)
-    println(s"Cleaned CityBike data written to $outputPathCityBike")
-    val outputPathWeather = s"${Constants.HDFS_PROCESSED_DATA_PATH}/weather"
-    weatherDF.write.mode("overwrite").option("header", "true").csv(outputPathWeather)
-    println(s"Cleaned Weather data written to $outputPathWeather")
+    // 1) save cleaned city bike data
+    val outputPathCityBikeParquet = s"${Constants.HDFS_PROCESSED_DATA_PATH}/citybike"
+
+    cityBikeDF
+      .write
+      .mode("overwrite")
+      .parquet(outputPathCityBikeParquet)
+
+    println(s"Cleaned CityBike data written to $outputPathCityBikeParquet")
+
+    // 2) save cleaned weather data
+    val outputPathWeatherParquet = s"${Constants.HDFS_PROCESSED_DATA_PATH}/weather"
+
+    weatherDF
+      .write
+      .mode("overwrite")
+      .parquet(outputPathWeatherParquet)
+
+    println(s"Cleaned Weather data written to $outputPathWeatherParquet")
 
     spark.stop()
   }
