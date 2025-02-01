@@ -75,9 +75,10 @@ object DataEnricher {
 
     val stationFeaturesDF = assembler.transform(stationDF.na.drop(Seq("station_lat","station_lng")))
 
-    // 4.2. Train KMeans with k=10
+    // 4.2. Train KMeans with k
+    val k = 50
     val kmeans = new KMeans()
-      .setK(10)
+      .setK(k)
       .setSeed(42)
       .setFeaturesCol("features")
       .setPredictionCol("zone_id")
@@ -191,23 +192,20 @@ object DataEnricher {
     val outputZone = s"${Constants.HDFS_PROCESSED_DATA_PATH}/zone"
     val outputZoneTS = s"${Constants.HDFS_PROCESSED_DATA_PATH}/zonets"
 
-    stationWithZoneDF
-      .write
-      .mode("overwrite")
-      .option("header", "true")
-      .csv(s"$outputStation")
+    // stationWithZoneDF => each station with assigned zone_id
+    stationWithZoneDF.write.mode("overwrite").parquet(outputStation)
 
-    zoneDF
-      .write
-      .mode("overwrite")
-      .option("header", "true")
-      .csv(s"$outputZone")
+    // zoneDF => basic zone info (zone_id, zone_lat, zone_lng)
+    zoneDF.write.mode("overwrite").parquet(outputZone)
 
-    zoneTimeSeriesDF
-      .write
-      .mode("overwrite")
-      .option("header", "true")
-      .csv(s"$outputZoneTS")
+    // zoneTimeSeriesDF => final data at zone/time level with weather and demand/supply
+    zoneTimeSeriesDF.write.mode("overwrite").parquet(outputZoneTS)
+
+    // test writing
+    val testDF = spark.read.parquet(outputZoneTS)
+    testDF.show()
+    println(s"Successfully written records: ${testDF.count()}")
+    testDF.printSchema()
 
     spark.stop()
   }
