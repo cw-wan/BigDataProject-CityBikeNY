@@ -6,7 +6,7 @@ import org.apache.spark.sql.types.{DataTypes, Metadata, StructField, StructType}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.expressions.Window
 
-object HadoopPreprocessor {
+object DataCleaner {
   def main(args: Array[String]): Unit = {
     // create SparkSession
     val spark = SparkSession.builder()
