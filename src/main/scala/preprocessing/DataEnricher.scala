@@ -73,7 +73,7 @@ object DataEnricher {
       .setInputCols(Array("station_lat", "station_lng"))
       .setOutputCol("features")
 
-    val stationFeaturesDF = assembler.transform(stationDF.na.drop(Seq("station_lat","station_lng")))
+    val stationFeaturesDF = assembler.transform(stationDF.na.drop(Seq("station_lat", "station_lng")))
 
     // 4.2. Train KMeans with k
     val k = 50
@@ -213,10 +213,10 @@ object DataEnricher {
     zoneDF.write.mode("overwrite").parquet(outputZone)
 
     // zoneTimeSeriesDF => final data at zone/time level with weather and demand/supply
-    zoneTimeSeriesDF.write.mode("overwrite").parquet(outputZoneTS)
+    zoneTimeSeriesDF.repartition(1).write.mode("overwrite").option("header", "true").csv(outputZoneTS)
 
     // test writing
-    val testDF = spark.read.parquet(outputZoneTS)
+    val testDF = spark.read.option("header", "true").csv(outputZoneTS)
     testDF.show()
     println(s"Successfully written records: ${testDF.count()}")
     testDF.printSchema()
