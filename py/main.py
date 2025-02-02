@@ -4,8 +4,6 @@ import numpy as np
 
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, median_absolute_error
-
-# Using XGBoost with scikit-learn interface
 from xgboost import XGBRegressor
 
 def add_time_features(df):
@@ -13,7 +11,7 @@ def add_time_features(df):
     Generate time-based features from the 'time' column:
     - hour, day_of_week, month, is_weekend
     """
-    df['time'] = pd.to_datetime(df['time'], errors='coerce', utc=True)  # Ensure UTC to avoid timezone issues
+    df['time'] = pd.to_datetime(df['time'], errors='coerce', utc=True)
     df['hour'] = df['time'].dt.hour
     # dt.dayofweek: Monday=0, Sunday=6
     df['day_of_week'] = df['time'].dt.weekday
@@ -89,10 +87,10 @@ def main():
     df.dropna(inplace=True)
 
     # -------------------------------
-    # 6. Split data (time-series safe split)
+    # 6. Split data
     # -------------------------------
     df.sort_values('time', inplace=True)
-    split_time = pd.Timestamp("2023-10-01 00:00:00", tz="UTC")  # Ensure matching timezone with df['time']
+    split_time = pd.Timestamp("2023-10-01 00:00:00", tz="UTC")
     train_df = df[df['time'] < split_time].copy()
     test_df = df[df['time'] >= split_time].copy()
 
@@ -105,17 +103,17 @@ def main():
     y_test = test_df['label']
 
     # -------------------------------
-    # 7. Configure and train XGBoost model (using scikit-learn's XGBRegressor)
+    # 7. Configure and train XGBoost model
     # -------------------------------
     params = {
         "objective": "reg:squarederror",
-        "n_estimators": 200,     # Equivalent to num_round
+        "n_estimators": 200,
         "max_depth": 8,
-        "learning_rate": 0.05,   # Equivalent to eta
+        "learning_rate": 0.05,
         "subsample": 0.8,
         "colsample_bytree": 0.8,
         "gamma": 0.1,
-        "tree_method": "hist",   # Use hist algorithm if supported by xgboost
+        "tree_method": "hist",
         "missing": 0.0
     }
 
