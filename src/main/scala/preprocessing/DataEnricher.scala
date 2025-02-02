@@ -9,7 +9,7 @@ import org.apache.spark.sql.functions._
 object DataEnricher {
   def main(args: Array[String]): Unit = {
     val spark = SparkSession.builder()
-      .appName("Data Enricher with Zones")
+      .appName("Data Enricher")
       .master("local[*]")
       .getOrCreate()
 
@@ -176,7 +176,21 @@ object DataEnricher {
     val zoneTimeSeriesDF = zoneTimeWithDemandSupply
       .select(
         col("zone_id"),
+        col("zone_lat"),
+        col("zone_lng"),
         col("time"),
+        col("temp"),
+        col("visibility"),
+        col("feels_like"),
+        col("humidity"),
+        col("wind_speed"),
+        col("wind_deg"),
+        col("wind_gust"),
+        col("rain_1h"),
+        col("snow_1h"),
+        col("clouds_all"),
+        col("weather_main"),
+        col("weather_description"),
         col("demand"),
         col("supply")
       )

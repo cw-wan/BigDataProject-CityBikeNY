@@ -13,6 +13,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % "3.3.0",
   // Spark MLlib for ML
   "org.apache.spark" %% "spark-mllib" % "3.3.0",
+  "ml.dmlc" % "xgboost4j-spark_2.12" % "1.7.6",
   // Hadoop client
   "org.apache.hadoop" % "hadoop-client" % "3.3.1",
   // log
