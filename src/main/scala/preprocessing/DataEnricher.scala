@@ -44,12 +44,16 @@ object DataEnricher {
       col("start_lng").as("station_lng")
     ).na.drop()
 
+    startStationDF.show()
+
     val endStationDF = bikeDF.select(
       col("end_station_id").as("station_id"),
       col("end_station_name").as("station_name"),
       col("end_lat").as("station_lat"),
       col("end_lng").as("station_lng")
     ).na.drop()
+
+    endStationDF.show()
 
     // Union, distinct, and keep only one row per station_id
     val stationDF = startStationDF
@@ -73,7 +77,11 @@ object DataEnricher {
       .setInputCols(Array("station_lat", "station_lng"))
       .setOutputCol("features")
 
-    val stationFeaturesDF = assembler.transform(stationDF.na.drop(Seq("station_lat", "station_lng")))
+    val stationDFConverted = stationDF
+      .withColumn("station_lat", col("station_lat").cast("double"))
+      .withColumn("station_lng", col("station_lng").cast("double"))
+
+    val stationFeaturesDF = assembler.transform(stationDFConverted.na.drop(Seq("station_lat", "station_lng")))
 
     // 4.2. Train KMeans with k
     val k = 50

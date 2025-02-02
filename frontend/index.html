@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>NYC, Jersey City, and Streets Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .tooltip {
+            position: absolute;
+            background-color: white;
+            padding: 5px;
+            border: 1px solid black;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+<svg width="1600" height="1200"></svg>
+<div class="tooltip"></div>
+
+<script>
+    const width = 1600,
+        height = 1200;
+
+    const svg = d3.select("svg");
+    const tooltip = d3.select(".tooltip");
+
+    // 分组：控制不同图层的绘制顺序
+    const mapGroup      = svg.append("g").attr("class", "map-layer");
+    const streetGroup   = svg.append("g").attr("class", "street-layer");
+    const linkGroup     = svg.append("g").attr("class", "link-layer");   // 连接线图层
+    const stationGroup  = svg.append("g").attr("class", "station-layer");
+    const zoneGroup     = svg.append("g").attr("class", "zone-layer");
+
+    // 同时加载所有需要的地理与业务数据
+    Promise.all([
+        d3.json("./nyc.geojson"),                       // NYC 边界
+        d3.json("./jersey_city.geojson"),               // Jersey City 边界
+        d3.json("./nyc-streets.geojson"),               // 街道数据
+        d3.json("http://localhost:8080/api/stations"),  // 单车站点数据
+        d3.json("http://localhost:8080/api/zones")      // 区域中心点数据
+    ]).then(([nycMap, jerseyMap, streetMap, stationData, zoneData]) => {
+
+        // 设定投影，保证地图在给定宽高内适配
+        const projection = d3.geoMercator().fitSize([width, height], {
+            type: "FeatureCollection",
+            features: nycMap.features
+                .concat(jerseyMap.features)
+                .concat(streetMap.features)
+        });
+
+        // 地理路径生成器
+        const pathGenerator = d3.geoPath().projection(projection);
+
+        // 绘制 NYC 地图（灰色）
+        mapGroup.selectAll(".nyc-path")
+            .data(nycMap.features)
+            .enter().append("path")
+            .attr("class", "nyc-path")
+            .attr("d", pathGenerator)
+            .attr("fill", "#ddd")
+            .attr("stroke", "#777")
+            .attr("stroke-width", 0.8);
+
+        // 绘制 Jersey City 地图（稍深灰）
+        mapGroup.selectAll(".jersey-path")
+            .data(jerseyMap.features)
+            .enter().append("path")
+            .attr("class", "jersey-path")
+            .attr("d", pathGenerator)
+            .attr("fill", "#ccc")
+            .attr("stroke", "#777")
+            .attr("stroke-width", 0.8);
+
+        // 绘制街道（线）
+        streetGroup.selectAll(".street-path")
+            .data(streetMap.features)
+            .enter().append("path")
+            .attr("class", "street-path")
+            .attr("d", pathGenerator)
+            .attr("fill", "none")
+            .attr("stroke", "#999")
+            .attr("stroke-width", 0.3);
+
+        // 处理 station 数据
+        stationData.forEach(d => {
+            d.lat = +d.station_lat;
+            d.lng = +d.station_lng;
+        });
+
+        // 处理 zone 数据
+        zoneData.forEach(z => {
+            z.lat = +z.zone_lat;
+            z.lng = +z.zone_lng;
+        });
+
+        // 将 zone 数据按 zone_id 存入字典，方便后续查找
+        const zoneById = {};
+        zoneData.forEach(z => {
+            zoneById[z.zone_id] = z;
+        });
+
+        // 绘制站点（浅黄色圆点）
+        stationGroup.selectAll(".station")
+            .data(stationData)
+            .enter().append("circle")
+            .attr("class", "station")
+            .attr("cx", d => projection([d.lng, d.lat])[0])
+            .attr("cy", d => projection([d.lng, d.lat])[1])
+            .attr("r", 2)
+            .attr("fill", "#ffeb3b")
+            .on("mouseover", (event, d) => {
+                d3.select(event.currentTarget)
+                    .transition()
+                    .attr("r", 4)
+                    .attr("fill", "orange");
+
+                tooltip.style("opacity", 1)
+                    .html(`
+                        <strong>${d.station_name}</strong><br>
+                        Zone ID: ${d.zone_id}<br>
+                        Lat: ${d.lat}, Lng: ${d.lng}
+                    `)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY + 10) + "px");
+            })
+            .on("mouseout", (event, d) => {
+                d3.select(event.currentTarget)
+                    .transition()
+                    .attr("r", 2)
+                    .attr("fill", "#ffeb3b");
+
+                tooltip.style("opacity", 0);
+            });
+
+        // 为每个 station 绘制连接线，连接 station 与其对应 zone 的中心点
+        linkGroup.selectAll(".station-zone-link")
+            .data(stationData.filter(d => zoneById[d.zone_id])) // 确保 zone 存在
+            .enter().append("line")
+            .attr("class", "station-zone-link")
+            .attr("x1", d => {
+                const z = zoneById[d.zone_id];
+                return projection([z.lng, z.lat])[0];
+            })
+            .attr("y1", d => {
+                const z = zoneById[d.zone_id];
+                return projection([z.lng, z.lat])[1];
+            })
+            .attr("x2", d => projection([d.lng, d.lat])[0])
+            .attr("y2", d => projection([d.lng, d.lat])[1])
+            .attr("stroke", "orange")
+            .attr("stroke-width", 0.4);
+
+        // 绘制 zone 中心点
+        zoneGroup.selectAll(".zone")
+            .data(zoneData)
+            .enter().append("circle")
+            .attr("class", "zone")
+            .attr("cx", d => projection([d.lng, d.lat])[0])
+            .attr("cy", d => projection([d.lng, d.lat])[1])
+            .attr("r", 3)
+            .attr("fill", "red")
+            .on("mouseover", (event, d) => {
+                // 高亮 zone 圆点
+                d3.select(event.currentTarget)
+                    .transition()
+                    .attr("r", 6)
+                    .attr("fill", "orange");
+
+                // 高亮属于这个 zone 的所有 station
+                stationGroup.selectAll(".station")
+                    .filter(s => s.zone_id === d.zone_id)
+                    .transition()
+                    .attr("r", 4)
+                    .attr("fill", "orange")
+                    .attr("stroke-width", 0.6);
+
+                // 高亮属于这个 zone 的所有连接线
+                linkGroup.selectAll(".station-zone-link")
+                    .filter(s => s.zone_id === d.zone_id)
+                    .transition()
+                    .attr("stroke", "orange")
+                    .attr("opacity", 1);
+
+                // 显示 tooltip
+                tooltip.style("opacity", 1)
+                    .html(`
+                        <strong>Zone ID: ${d.zone_id}</strong><br>
+                        Lat: ${d.lat}, Lng: ${d.lng}
+                    `)
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY + 10) + "px");
+            })
+            .on("mousemove", (event, d) => {
+                // 跟随鼠标移动更新 tooltip 位置
+                tooltip
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY + 10) + "px");
+            })
+            .on("mouseout", (event, d) => {
+                // 恢复 zone 原始状态
+                d3.select(event.currentTarget)
+                    .transition()
+                    .attr("r", 4)
+                    .attr("fill", "red");
+
+                // 恢复当前 zone 对应的所有 station
+                stationGroup.selectAll(".station")
+                    .filter(s => s.zone_id === d.zone_id)
+                    .transition()
+                    .attr("r", 2)
+                    .attr("fill", "#ffeb3b");
+
+                // 恢复对应的所有连接线
+                linkGroup.selectAll(".station-zone-link")
+                    .filter(s => s.zone_id === d.zone_id)
+                    .transition()
+                    .attr("stroke", "orange");
+
+                // 隐藏 tooltip
+                tooltip.style("opacity", 0);
+            });
+    });
+</script>
+</body>
+</html>
+

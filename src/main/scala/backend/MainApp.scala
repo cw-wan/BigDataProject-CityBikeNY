@@ -19,6 +19,8 @@ object MainApp {
       .master("local[*]")
       .getOrCreate()
 
+    spark.sparkContext.setLogLevel("WARN")
+
     val sparkService = new SparkService(spark)
 
     val apiRoutes = new ApiRoutes(sparkService)

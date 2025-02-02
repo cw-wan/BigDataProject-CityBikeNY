@@ -25,10 +25,10 @@ object DataCleaner {
       StructField("start_station_id", DataTypes.StringType, nullable = false, Metadata.empty),
       StructField("end_station_name", DataTypes.StringType, nullable = false, Metadata.empty),
       StructField("end_station_id", DataTypes.StringType, nullable = false, Metadata.empty),
-      StructField("start_lat", DataTypes.DoubleType, nullable = false, Metadata.empty),
-      StructField("start_lng", DataTypes.DoubleType, nullable = false, Metadata.empty),
-      StructField("end_lat", DataTypes.DoubleType, nullable = false, Metadata.empty),
-      StructField("end_lng", DataTypes.DoubleType, nullable = false, Metadata.empty),
+      StructField("start_lat", DataTypes.StringType, nullable = false, Metadata.empty),
+      StructField("start_lng", DataTypes.StringType, nullable = false, Metadata.empty),
+      StructField("end_lat", DataTypes.StringType, nullable = false, Metadata.empty),
+      StructField("end_lng", DataTypes.StringType, nullable = false, Metadata.empty),
       StructField("member_casual", DataTypes.StringType, nullable = false, Metadata.empty)
     ))
     var cityBikeDF: DataFrame = spark.read
