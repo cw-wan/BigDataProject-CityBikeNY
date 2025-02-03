@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <title>NYC, Jersey City, and Streets Visualization</title>
+    <title>NYC Citybike Station Visualization</title>
     <!-- D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <!-- Moment.js and Moment Timezone -->
@@ -77,7 +77,7 @@
         <label>
             Hour:
             <input type="range" id="hour-slider" min="0" max="23" step="1" value="0">
-            <span id="hour-value">0</span> hour
+            <span id="hour-value">0</span> o'clock
         </label>
     </div>
     <hr>
@@ -192,13 +192,13 @@
                         `<strong>Station ID: ${d.station_id}</strong><br>
                <strong>Station Name: ${d.station_name}</strong><br>`
                     )
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY + 10) + "px");
+                    .style("left", (event.clientX) + "px")
+                    .style("top", (event.clientY) + "px");
             })
             .on("mousemove", (event, d) => {
                 tooltip
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY + 10) + "px");
+                    .style("left", (event.clientX) + "px")
+                    .style("top", (event.clientY) + "px");
             })
             .on("mouseout", (event, d) => {
                 tooltip.style("opacity", 0);
@@ -240,13 +240,13 @@
                Demand: ${demand}<br>
                Supply: ${supply}`
                     )
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY + 10) + "px");
+                    .style("left", (event.clientX) + "px")
+                    .style("top", (event.clientY) + "px");
             })
             .on("mousemove", (event, d) => {
                 tooltip
-                    .style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY + 10) + "px");
+                    .style("left", (event.clientX) + "px")
+                    .style("top", (event.clientY) + "px");
             })
             .on("mouseout", (event, d) => {
                 tooltip.style("opacity", 0);
@@ -313,7 +313,7 @@
                 maxVal = dsExtent[1];
 
             const colorScale = d3.scaleDiverging()
-                .domain([minVal - 3, 0, maxVal + 3])
+                .domain([minVal - 5, 0, maxVal + 5])
                 .interpolator(d3.interpolateRdBu);
 
             zoneGroup.selectAll(".zone")
