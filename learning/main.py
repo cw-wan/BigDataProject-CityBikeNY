@@ -147,5 +147,11 @@ def main():
     model.save_model(output_model_path)
     print("Model saved to:", output_model_path)
 
+    # Results:
+    # Root Mean Squared Error (RMSE)  = 4.8678
+    # Mean Absolute Error (MAE)      = 1.1544
+    # R² Score                       = 0.9811
+    # Median Absolute Error          = 0.4283
+
 if __name__ == "__main__":
     main()
