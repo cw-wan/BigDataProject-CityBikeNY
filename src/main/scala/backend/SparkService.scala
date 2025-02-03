@@ -2,7 +2,10 @@ package backend
 
 import org.apache.spark.sql.{SparkSession, DataFrame}
 import common.Constants
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.functions.to_timestamp
+import org.apache.spark.sql.functions.col
+import java.sql.Timestamp
+import java.time.OffsetDateTime
 
 class SparkService(spark: SparkSession) {
 
@@ -41,13 +44,16 @@ class SparkService(spark: SparkSession) {
 
   def getZoneTSByTime(query: String): Seq[Map[String, String]] = {
     val normalizedQuery = query.replace(" ", "+")
-    val filteredDF = zoneTSDF
-      .filter(col("time") === normalizedQuery)
+    val queryTimestamp: Timestamp = Timestamp.from(OffsetDateTime.parse(normalizedQuery).toInstant)
+    val filteredDF = zoneTSDF.filter(
+      to_timestamp(col("time"), "yyyy-MM-dd'T'HH:mm:ss.SSSXXX") === queryTimestamp
+    )
     filteredDF.show()
+
     filteredDF.collect().map { row =>
-      row.schema.fieldNames.map(field =>
+      row.schema.fieldNames.map { field =>
         field -> Option(row.getAs[Any](field)).map(_.toString).getOrElse("null")
-      ).toMap
+      }.toMap
     }.toSeq
   }
 }

@@ -1,13 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>NYC, Jersey City, and Streets Visualization</title>
+    <!-- D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Moment.js and Moment Timezone -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.43/moment-timezone-with-data.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
+            display: flex;
+        }
+
+        /* Left-side control panel, right side for the SVG map */
+        #controls {
+            width: 300px;
+            padding: 10px;
+            border-right: 1px solid #ccc;
+        }
+
+        #map-container {
+            flex: 1;
+            position: relative;
         }
 
         .tooltip {
@@ -19,36 +36,92 @@
             pointer-events: none;
             opacity: 0;
         }
+
+        #time-controls label {
+            display: block;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
-<svg width="1600" height="1200"></svg>
-<div class="tooltip"></div>
+<!-- Control Panel -->
+<div id="controls">
+    <h2>Year 2023</h2>
+    <div id="time-controls">
+        <label>
+            Month:
+            <select id="month-select">
+                <option value="1">January</option>
+                <option value="2">February</option>
+                <option value="3">March</option>
+                <option value="4">April</option>
+                <option value="5">May</option>
+                <option value="6">June</option>
+                <option value="7">July</option>
+                <option value="8">August</option>
+                <option value="9">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+            </select>
+        </label>
+        <label>
+            Day:
+            <select id="day-select">
+                <!-- Initially fill with 1 to 31 -->
+                ${Array.from({length: 31}, (_, i) => `
+                <option value="${i+1}">${i+1}</option>
+                `).join('')}
+            </select>
+        </label>
+        <label>
+            Hour:
+            <input type="range" id="hour-slider" min="0" max="23" step="1" value="0">
+            <span id="hour-value">0</span> hour
+        </label>
+    </div>
+    <hr>
+    <div id="weather-info">
+        <h3>Weather Information</h3>
+        <div id="weather-content">
+            <!-- Weather information from the backend will be shown here -->
+            No data
+        </div>
+    </div>
+</div>
+
+<!-- Map SVG -->
+<div id="map-container">
+    <svg width="1000" height="800"></svg>
+    <div class="tooltip"></div>
+</div>
 
 <script>
-    const width = 1600,
-        height = 1200;
+    moment.tz.setDefault("America/New_York");
+
+    const width = 1000,
+        height = 800;
 
     const svg = d3.select("svg");
     const tooltip = d3.select(".tooltip");
 
-    // 分组：控制不同图层的绘制顺序
-    const mapGroup      = svg.append("g").attr("class", "map-layer");
-    const streetGroup   = svg.append("g").attr("class", "street-layer");
-    const linkGroup     = svg.append("g").attr("class", "link-layer");   // 连接线图层
-    const stationGroup  = svg.append("g").attr("class", "station-layer");
-    const zoneGroup     = svg.append("g").attr("class", "zone-layer");
+    const mapGroup = svg.append("g").attr("class", "map-layer");
+    const streetGroup = svg.append("g").attr("class", "street-layer");
+    const linkGroup = svg.append("g").attr("class", "link-layer");
+    const stationGroup = svg.append("g").attr("class", "station-layer");
+    const zoneGroup = svg.append("g").attr("class", "zone-layer");
 
-    // 同时加载所有需要的地理与业务数据
+    let initialZoneData = [];
+    let currentZoneMetrics = [];
+
     Promise.all([
-        d3.json("./nyc.geojson"),                       // NYC 边界
-        d3.json("./jersey_city.geojson"),               // Jersey City 边界
-        d3.json("./nyc-streets.geojson"),               // 街道数据
-        d3.json("http://localhost:8080/api/stations"),  // 单车站点数据
-        d3.json("http://localhost:8080/api/zones")      // 区域中心点数据
+        d3.json("./nyc.geojson"),
+        d3.json("./jersey_city.geojson"),
+        d3.json("./nyc-streets.geojson"),
+        d3.json("http://localhost:8080/api/stations"),
+        d3.json("http://localhost:8080/api/zones")
     ]).then(([nycMap, jerseyMap, streetMap, stationData, zoneData]) => {
 
-        // 设定投影，保证地图在给定宽高内适配
         const projection = d3.geoMercator().fitSize([width, height], {
             type: "FeatureCollection",
             features: nycMap.features
@@ -56,10 +129,8 @@
                 .concat(streetMap.features)
         });
 
-        // 地理路径生成器
         const pathGenerator = d3.geoPath().projection(projection);
 
-        // 绘制 NYC 地图（灰色）
         mapGroup.selectAll(".nyc-path")
             .data(nycMap.features)
             .enter().append("path")
@@ -69,7 +140,6 @@
             .attr("stroke", "#777")
             .attr("stroke-width", 0.8);
 
-        // 绘制 Jersey City 地图（稍深灰）
         mapGroup.selectAll(".jersey-path")
             .data(jerseyMap.features)
             .enter().append("path")
@@ -79,7 +149,6 @@
             .attr("stroke", "#777")
             .attr("stroke-width", 0.8);
 
-        // 绘制街道（线）
         streetGroup.selectAll(".street-path")
             .data(streetMap.features)
             .enter().append("path")
@@ -89,60 +158,54 @@
             .attr("stroke", "#999")
             .attr("stroke-width", 0.3);
 
-        // 处理 station 数据
         stationData.forEach(d => {
             d.lat = +d.station_lat;
             d.lng = +d.station_lng;
         });
 
-        // 处理 zone 数据
         zoneData.forEach(z => {
             z.lat = +z.zone_lat;
             z.lng = +z.zone_lng;
         });
+        initialZoneData = zoneData;
 
-        // 将 zone 数据按 zone_id 存入字典，方便后续查找
         const zoneById = {};
         zoneData.forEach(z => {
             zoneById[z.zone_id] = z;
         });
 
-        // 绘制站点（浅黄色圆点）
         stationGroup.selectAll(".station")
             .data(stationData)
             .enter().append("circle")
             .attr("class", "station")
             .attr("cx", d => projection([d.lng, d.lat])[0])
             .attr("cy", d => projection([d.lng, d.lat])[1])
-            .attr("r", 2)
+            .attr("r", 1.5)
+            .attr("opacity", 0.8)
             .attr("fill", "#ffeb3b")
             .on("mouseover", (event, d) => {
-                d3.select(event.currentTarget)
-                    .transition()
-                    .attr("r", 4)
-                    .attr("fill", "orange");
-
+                const metrics = currentZoneMetrics.find(z => z.zone_id === d.zone_id);
+                const demand = metrics ? metrics.demand : "N/A";
+                const supply = metrics ? metrics.supply : "N/A";
                 tooltip.style("opacity", 1)
-                    .html(`
-                        <strong>${d.station_name}</strong><br>
-                        Zone ID: ${d.zone_id}<br>
-                        Lat: ${d.lat}, Lng: ${d.lng}
-                    `)
+                    .html(
+                        `<strong>Station ID: ${d.station_id}</strong><br>
+               <strong>Station Name: ${d.station_name}</strong><br>`
+                    )
+                    .style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY + 10) + "px");
+            })
+            .on("mousemove", (event, d) => {
+                tooltip
                     .style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY + 10) + "px");
             })
             .on("mouseout", (event, d) => {
-                d3.select(event.currentTarget)
-                    .transition()
-                    .attr("r", 2)
-                    .attr("fill", "#ffeb3b");
-
                 tooltip.style("opacity", 0);
             });
 
-        // 为每个 station 绘制连接线，连接 station 与其对应 zone 的中心点
         linkGroup.selectAll(".station-zone-link")
-            .data(stationData.filter(d => zoneById[d.zone_id])) // 确保 zone 存在
+            .data(stationData.filter(d => zoneById[d.zone_id]))
             .enter().append("line")
             .attr("class", "station-zone-link")
             .attr("x1", d => {
@@ -156,9 +219,9 @@
             .attr("x2", d => projection([d.lng, d.lat])[0])
             .attr("y2", d => projection([d.lng, d.lat])[1])
             .attr("stroke", "orange")
+            .attr("opacity", 0.65)
             .attr("stroke-width", 0.4);
 
-        // 绘制 zone 中心点
         zoneGroup.selectAll(".zone")
             .data(zoneData)
             .enter().append("circle")
@@ -166,69 +229,120 @@
             .attr("cx", d => projection([d.lng, d.lat])[0])
             .attr("cy", d => projection([d.lng, d.lat])[1])
             .attr("r", 3)
-            .attr("fill", "red")
+            .attr("fill", "white")
             .on("mouseover", (event, d) => {
-                // 高亮 zone 圆点
-                d3.select(event.currentTarget)
-                    .transition()
-                    .attr("r", 6)
-                    .attr("fill", "orange");
-
-                // 高亮属于这个 zone 的所有 station
-                stationGroup.selectAll(".station")
-                    .filter(s => s.zone_id === d.zone_id)
-                    .transition()
-                    .attr("r", 4)
-                    .attr("fill", "orange")
-                    .attr("stroke-width", 0.6);
-
-                // 高亮属于这个 zone 的所有连接线
-                linkGroup.selectAll(".station-zone-link")
-                    .filter(s => s.zone_id === d.zone_id)
-                    .transition()
-                    .attr("stroke", "orange")
-                    .attr("opacity", 1);
-
-                // 显示 tooltip
+                const metrics = currentZoneMetrics.find(z => z.zone_id === d.zone_id);
+                const demand = metrics ? metrics.demand : "N/A";
+                const supply = metrics ? metrics.supply : "N/A";
                 tooltip.style("opacity", 1)
-                    .html(`
-                        <strong>Zone ID: ${d.zone_id}</strong><br>
-                        Lat: ${d.lat}, Lng: ${d.lng}
-                    `)
+                    .html(
+                        `<strong>Zone ID: ${d.zone_id}</strong><br>
+               Demand: ${demand}<br>
+               Supply: ${supply}`
+                    )
                     .style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY + 10) + "px");
             })
             .on("mousemove", (event, d) => {
-                // 跟随鼠标移动更新 tooltip 位置
                 tooltip
                     .style("left", (event.pageX + 10) + "px")
                     .style("top", (event.pageY + 10) + "px");
             })
             .on("mouseout", (event, d) => {
-                // 恢复 zone 原始状态
-                d3.select(event.currentTarget)
-                    .transition()
-                    .attr("r", 4)
-                    .attr("fill", "red");
-
-                // 恢复当前 zone 对应的所有 station
-                stationGroup.selectAll(".station")
-                    .filter(s => s.zone_id === d.zone_id)
-                    .transition()
-                    .attr("r", 2)
-                    .attr("fill", "#ffeb3b");
-
-                // 恢复对应的所有连接线
-                linkGroup.selectAll(".station-zone-link")
-                    .filter(s => s.zone_id === d.zone_id)
-                    .transition()
-                    .attr("stroke", "orange");
-
-                // 隐藏 tooltip
                 tooltip.style("opacity", 0);
             });
+
+        updateData();
     });
+
+    const monthSelect = document.getElementById("month-select");
+    const daySelect = document.getElementById("day-select");
+    const hourSlider = document.getElementById("hour-slider");
+    const hourValue = document.getElementById("hour-value");
+
+    monthSelect.addEventListener("change", () => {
+        updateDayOptions();
+        updateData();
+    });
+    daySelect.addEventListener("change", updateData);
+    hourSlider.addEventListener("input", function () {
+        hourValue.textContent = hourSlider.value;
+        updateData();
+    });
+
+    function updateDayOptions() {
+        const selectedMonth = +monthSelect.value;
+        const daysInMonth = moment(`2023-${selectedMonth}`, "YYYY-M").daysInMonth();
+        daySelect.innerHTML = "";
+        for (let d = 1; d <= daysInMonth; d++) {
+            const opt = document.createElement("option");
+            opt.value = d;
+            opt.innerHTML = d;
+            daySelect.appendChild(opt);
+        }
+    }
+
+    updateDayOptions();
+
+    function formatTimeNY(year, month, day, hour) {
+        const m = moment.tz({year, month: month - 1, day, hour}, "America/New_York");
+        return m.format("YYYY-MM-DD[T]HH:mm:ss.SSSZ");
+    }
+
+    function updateData() {
+        const year = 2023;
+        const month = +monthSelect.value;
+        const day = +daySelect.value;
+        const hour = +hourSlider.value;
+        const timeStr = formatTimeNY(year, month, day, hour);
+
+        const url = "http://localhost:8080/api/zonets?time=" + encodeURIComponent(timeStr);
+        console.log("Requesting URL:", url);
+        d3.json(url).then(data => {
+            if (!data || data.length === 0) {
+                console.warn("No data returned");
+                return;
+            }
+            data.forEach(d => {
+                d.demandSupply = -(+d.demand) + (+d.supply);
+            });
+            currentZoneMetrics = data;
+
+            const dsExtent = d3.extent(data, d => d.demandSupply);
+            const minVal = dsExtent[0],
+                maxVal = dsExtent[1];
+
+            const colorScale = d3.scaleDiverging()
+                .domain([minVal - 3, 0, maxVal + 3])
+                .interpolator(d3.interpolateRdBu);
+
+            zoneGroup.selectAll(".zone")
+                .transition()
+                .duration(500)
+                .attr("fill", function (d) {
+                    const zoneData = data.find(z => z.zone_id === d.zone_id);
+                    if (zoneData) {
+                        return colorScale(zoneData.demandSupply);
+                    } else {
+                        return "red";
+                    }
+                });
+
+            const weather = data[0];
+            const weatherHtml = `
+          <p><strong>Weather:</strong> ${weather.weather_main} (${weather.weather_description})</p>
+          <p><strong>Temperature:</strong> ${weather.temp} °C, Feels like: ${weather.feels_like} °C</p>
+          <p><strong>Humidity:</strong> ${weather.humidity}%</p>
+          <p><strong>Wind Speed:</strong> ${weather.wind_speed} m/s</p>
+          <p><strong>Wind Direction:</strong> ${weather.wind_deg}°</p>
+          <p><strong>Visibility:</strong> ${weather.visibility} m</p>
+        `;
+            document.getElementById("weather-content").innerHTML = weatherHtml;
+        })
+            .catch(error => {
+                console.error("Error requesting zonets API:", error);
+            });
+    }
 </script>
 </body>
 </html>
-
