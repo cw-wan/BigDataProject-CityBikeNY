@@ -72,7 +72,7 @@ def main():
     # -------------------------------
     feature_cols = [
         "zone_id", "zone_lat", "zone_lng",
-        "temp", "visibility", "wind_speed", "weather_main_index",
+        # "temp", "visibility", "wind_speed", "weather_main_index",
         "hour", "day_of_week", "month", "is_weekend",
         "lag_1", "lag_24", "lag_168", "rolling_3h_mean", "rolling_24h_max", "delta_1h"
     ]
@@ -143,20 +143,6 @@ def main():
     output_model_path = os.path.join(model_dir, "citybike-xgboost.model")
     model.save_model(output_model_path)
     print("Model saved to:", output_model_path)
-
-    """
-    Results:
-    - Main -
-    Root Mean Squared Error (RMSE)  = 4.8112
-    Mean Absolute Error (MAE)      = 0.8511
-    R² Score                       = 0.9815
-    Median Absolute Error          = 0.1644
-    - w/o weather - 
-    Root Mean Squared Error (RMSE)  = 4.8921
-    Mean Absolute Error (MAE)      = 0.9063
-    R² Score                       = 0.9809
-    Median Absolute Error          = 0.1831
-    """
 
 
 if __name__ == "__main__":

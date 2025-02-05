@@ -13,6 +13,9 @@ object DataEnricher {
       .master("local[*]")
       .getOrCreate()
 
+    // Set Spark session time zone to New York time
+    spark.conf.set("spark.sql.session.timeZone", "America/New_York")
+
     spark.sparkContext.setLogLevel("WARN")
 
     // --------------------------------------------------------------------

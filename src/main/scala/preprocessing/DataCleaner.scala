@@ -14,6 +14,9 @@ object DataCleaner {
       .master("local[*]") // local mode for development
       .getOrCreate()
 
+    // Set Spark session time zone to New York time
+    spark.conf.set("spark.sql.session.timeZone", "America/New_York")
+
     // read raw citybike data (csv) from hdfs
     val cityBikeDataPath = s"${Constants.HDFS_RAW_DATA_PATH}/citybike"
     val cityBikeSchema = new StructType(Array[StructField](
